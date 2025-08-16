@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PRATYAKSH – GLB Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body { margin:0; height:100%; background:#0b0b0b; color:#eee; font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    #app { position:fixed; inset:0; }
+    .hud {
+      position: fixed; left: 12px; top: 12px; background: rgba(0,0,0,0.5);
+      padding: 10px 12px; border-radius: 10px; font-size: 14px; backdrop-filter: blur(8px);
+    }
+    .hud a { color:#9fd3ff; }
+    .row { margin-top:8px; }
+    input { width: 320px; max-width: 60vw; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div class="hud">
+    <div><strong>PRATYAKSH – GLB Viewer</strong></div>
+    <div class="row">Default loads: <code>../outputs/model.glb</code></div>
+    <div class="row">
+      Load custom GLB:
+      <input id="file" type="file" accept=".glb,.gltf" />
+    </div>
+    <div class="row">Tip: drag to orbit, scroll to zoom, right-drag to pan.</div>
+    <div class="row"><a href="https://threejs.org" target="_blank" rel="noreferrer">three.js</a> • <a href="https://github.com/mrdoob/three.js/tree/dev/examples/jsm/loaders/GLTFLoader.js" target="_blank" rel="noreferrer">GLTFLoader</a></div>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.164.1/build/three.module.js";
+    import { OrbitControls } from "https://unpkg.com/three@0.164.1/examples/jsm/controls/OrbitControls.js";
+    import { GLTFLoader } from "https://unpkg.com/three@0.164.1/examples/jsm/loaders/GLTFLoader.js";
+
+    const app = document.getElementById('app');
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x0b0b0b);
+    app.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.01, 100);
+    camera.position.set(0.6, 0.5, 0.6);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    // lights
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(2, 2, 1.5);
+    scene.add(dir);
+
+    // ground (optional reference)
+    const grid = new THREE.GridHelper(2, 20, 0x444444, 0x222222);
+    scene.add(grid);
+
+    const loader = new GLTFLoader();
+    let current;
+
+    function centerAndAdd(gltf) {
+      if (current) scene.remove(current);
+      current = gltf.scene;
+      // center model
+      const box = new THREE.Box3().setFromObject(current);
+      const center = box.getCenter(new THREE.Vector3());
+      current.position.sub(center);
+      scene.add(current);
+    }
+
+    // load default export
+    loader.load("../outputs/model.glb", centerAndAdd, undefined, (e) => {
+      console.warn("Could not load default ../outputs/model.glb. Export one first.");
+    });
+
+    // file input
+    document.getElementById('file').addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      loader.load(url, (gltf) => {
+        centerAndAdd(gltf);
+        URL.revokeObjectURL(url);
+      });
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    (function tick(){
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
